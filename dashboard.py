@@ -2,6 +2,17 @@
 #  MediTrack A+ v3.0 — Industry-Level Analytics Dashboard
 #  16 Pages including 7 new features + upgraded doctor avatars
 # ============================================================
+import os
+
+# Auto-generate data and model files if missing (needed for Streamlit Cloud)
+if not os.path.exists('meditrack_data.csv'):
+    import generate_data
+    generate_data.generate_data()
+
+if not os.path.exists('model.pkl'):
+    import model as model_trainer
+    model_trainer.train_model()
+
 
 import os, time, pickle, smtplib, io, random
 from email.mime.text import MIMEText
