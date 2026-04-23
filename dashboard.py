@@ -2,17 +2,6 @@
 #  MediTrack A+ v3.0 — Industry-Level Analytics Dashboard
 #  16 Pages including 7 new features + upgraded doctor avatars
 # ============================================================
-import os
-
-# Auto-generate data and model files if missing (needed for Streamlit Cloud)
-if not os.path.exists('meditrack_data.csv'):
-    import generate_data
-    generate_data.generate_data()
-
-if not os.path.exists('model.pkl'):
-    import model as model_trainer
-    model_trainer.train_model()
-
 
 import os, time, pickle, smtplib, io, random
 from email.mime.text import MIMEText
@@ -51,9 +40,10 @@ st.set_page_config(
 # ── Global CSS ───────────────────────────────────────────────
 st.markdown("""
 <style>
-html,body,[class*="css"]{font-family:'Segoe UI',sans-serif;}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif;}
 [data-testid="stMetricValue"]{font-size:1.55rem!important;font-weight:800!important;color:#1a73e8!important;}
-[data-testid="stMetricLabel"]{font-size:.78rem!important;color:#666!important;}
+[data-testid="stMetricLabel"]{font-size:.78rem!important;color:#777!important;font-weight:500!important;}
 .section-header{background:linear-gradient(90deg,#1a73e8,#0d47a1);color:white;
   padding:10px 18px;border-radius:10px;margin-bottom:14px;font-weight:700;font-size:1rem;}
 .insight-box{background:linear-gradient(135deg,#fff9e6,#fff3cc);border-left:4px solid #f5a623;
@@ -67,10 +57,95 @@ html,body,[class*="css"]{font-family:'Segoe UI',sans-serif;}
   border-radius:14px;padding:20px;margin-bottom:16px;}
 .booking-success{background:#e8f5e9;border:1px solid #4caf50;border-radius:10px;
   padding:16px;text-align:center;font-weight:600;color:#1b5e20;}
+
+/* ── HERO BANNER ── */
+.hero-banner{
+  background:linear-gradient(135deg,#0d1b2a 0%,#1a3a5c 40%,#1a73e8 100%);
+  border-radius:18px;padding:36px 40px;margin-bottom:28px;
+  box-shadow:0 8px 32px rgba(26,115,232,.25);
+  position:relative;overflow:hidden;
+}
+.hero-banner::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:240px;height:240px;border-radius:50%;
+  background:rgba(255,255,255,.05);
+}
+.hero-banner::after{
+  content:'';position:absolute;bottom:-60px;right:60px;
+  width:160px;height:160px;border-radius:50%;
+  background:rgba(255,255,255,.04);
+}
+.hero-title{font-size:2.2rem;font-weight:800;color:#fff;
+  letter-spacing:-.5px;margin:0 0 6px;line-height:1.1;}
+.hero-sub{font-size:1rem;color:rgba(255,255,255,.72);font-weight:400;margin:0 0 20px;}
+.hero-pills{display:flex;gap:8px;flex-wrap:wrap;}
+.hero-pill{background:rgba(255,255,255,.12);color:#fff;font-size:.78rem;font-weight:500;
+  padding:5px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.2);}
+.hero-stat{text-align:center;}
+.hero-stat-val{font-size:1.7rem;font-weight:800;color:#fff;}
+.hero-stat-lbl{font-size:.72rem;color:rgba(255,255,255,.6);text-transform:uppercase;
+  letter-spacing:.5px;margin-top:2px;}
+
+/* ── SIDEBAR ── */
 [data-testid="stSidebar"]{background:linear-gradient(180deg,#0d1b2a 0%,#1a2f4a 100%)!important;}
 [data-testid="stSidebar"] *{color:#c8d8e8!important;}
+[data-testid="stSidebar"] .stRadio label{
+  padding:6px 10px;border-radius:8px;transition:background .15s;display:block;
+}
+[data-testid="stSidebar"] .stRadio label:hover{background:rgba(255,255,255,.08)!important;}
 </style>
 """, unsafe_allow_html=True)
+
+# ── Gmail Configuration ──────────────────────────────────────
+# Credentials are entered via the UI (Smart Reminders page) — no hardcoding needed
+GMAIL_USER     = ""
+GMAIL_PASSWORD = ""
+GMAIL_ENABLED  = False  # controlled via st.session_state.gmail_enabled
+
+def send_real_email(to_email: str, patient_name: str, subject: str, body: str,
+                    gmail_user: str = "", gmail_pass: str = "") -> bool:
+    """Send a real email via Gmail SMTP. Returns True on success."""
+    _user = gmail_user or GMAIL_USER
+    _pass = gmail_pass or GMAIL_PASSWORD
+    if not _user or not _pass:
+        return False
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['From']    = f"MediTrack A+ <{_user}>"
+        msg['To']      = to_email
+        msg['Subject'] = subject
+
+        html_body = f"""
+        <html><body style='font-family:Inter,sans-serif;background:#f4f6fb;padding:20px;'>
+        <div style='max-width:540px;margin:0 auto;background:white;border-radius:14px;
+             box-shadow:0 4px 20px rgba(0,0,0,.08);overflow:hidden;'>
+          <div style='background:linear-gradient(135deg,#1a73e8,#0d47a1);padding:24px 28px;'>
+            <h2 style='color:white;margin:0;font-size:1.3rem;'>🏥 MediTrack A+</h2>
+            <p style='color:rgba(255,255,255,.8);margin:4px 0 0;font-size:.85rem;'>
+              Healthcare Intelligence Platform</p>
+          </div>
+          <div style='padding:28px;'>
+            <pre style='font-family:Inter,sans-serif;white-space:pre-wrap;
+                 font-size:.9rem;color:#2d3748;line-height:1.7;'>{body}</pre>
+          </div>
+          <div style='background:#f8faff;padding:16px 28px;border-top:1px solid #e8eef8;
+               font-size:.75rem;color:#999;'>
+            MediTrack A+ | Healthcare Intelligence Platform | Do not reply to this email
+          </div>
+        </div></body></html>"""
+
+        msg.attach(MIMEText(body, 'plain'))
+        msg.attach(MIMEText(html_body, 'html'))
+
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(_user, _pass)
+        server.sendmail(_user, to_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.warning(f"Email to {to_email} failed: {e}")
+        return False
 
 # ── Constants ────────────────────────────────────────────────
 REMINDER_LOG  = 'reminder_log.csv'
@@ -95,8 +170,8 @@ DOCTOR_INFO = [
         'exp': '8 Years', 'timing': '9 AM – 2 PM',
         'edu': 'DPT — University of Health Sciences, Lahore',
         'color': '#e8f4fd', 'border': '#1a73e8',
-        # adventurer = best masculine illustrated avatar style
-        'img': 'https://api.dicebear.com/7.x/adventurer/svg?seed=Hammad2025&backgroundColor=b6e3f4,c8d9f0&radius=50',
+        # Male: adventurer with beard/male features
+        'img': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Hammad2025&top=shortHair&hairColor=brown&facialHair=beardLight&facialHairColor=brown&clothe=blazerShirt&eyes=default&eyebrow=default&mouth=smile&skin=light&backgroundColor=b6e3f4',
     },
     {
         'name': 'Dr. Saad', 'key': 'Dr.Saad',
@@ -104,8 +179,8 @@ DOCTOR_INFO = [
         'exp': '12 Years', 'timing': '10 AM – 5 PM',
         'edu': 'MBBS — King Edward Medical University, Lahore',
         'color': '#f0eeff', 'border': '#6c5ce7',
-        # adventurer with different seed for distinct look
-        'img': 'https://api.dicebear.com/7.x/adventurer/svg?seed=Saad2025&backgroundColor=c0aede,d4c5f0&radius=50',
+        # Male: avataaars with short hair, blazer, beard
+        'img': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Saad2025&top=shortHairShortFlat&hairColor=black&facialHair=beardMedium&facialHairColor=black&clothe=blazerSweater&eyes=happy&eyebrow=raisedExcited&mouth=smile&skin=brown&backgroundColor=c0aede',
     },
     {
         'name': 'Dr. Aleena', 'key': 'Dr.Aleena',
@@ -113,8 +188,8 @@ DOCTOR_INFO = [
         'exp': '10 Years', 'timing': '9 AM – 3 PM',
         'edu': 'FCPS Cardiology — CPSP, Islamabad',
         'color': '#fff0f3', 'border': '#e84393',
-        # lorelei = most beautiful feminine illustrated avatar
-        'img': 'https://api.dicebear.com/7.x/lorelei/svg?seed=Aleena2025&backgroundColor=ffd5dc,ffbdcf&radius=50',
+        # Female: avataaars with long hair, hijab-optional, female features
+        'img': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aleena2025&top=longHairStraight&hairColor=black&accessoriesType=none&clothe=blazerShirt&eyes=wink&eyebrow=raisedExcited&mouth=smile&skin=light&backgroundColor=ffd5dc',
     },
     {
         'name': 'Dr. Maryam', 'key': 'Dr.Maryam',
@@ -122,8 +197,8 @@ DOCTOR_INFO = [
         'exp': '7 Years', 'timing': '11 AM – 6 PM',
         'edu': 'FCPS Neurology — Aga Khan University, Karachi',
         'color': '#f0fff4', 'border': '#00b894',
-        # lorelei with different seed & color for distinct look
-        'img': 'https://api.dicebear.com/7.x/lorelei/svg?seed=Maryam2025&backgroundColor=d1f4cc,b8edbc&radius=50',
+        # Female: avataaars with curly long hair, female features
+        'img': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maryam2025&top=longHairCurly&hairColor=brown&accessoriesType=none&clothe=blazerShirt&eyes=happy&eyebrow=default&mouth=smile&skin=brown&backgroundColor=d1f4cc',
     },
 ]
 
@@ -361,6 +436,14 @@ def generate_pdf(df):
 # ── Session state init ────────────────────────────────────────
 if 'goals' not in st.session_state:
     st.session_state.goals = GOALS_DEFAULTS.copy()
+if 'page_history' not in st.session_state:
+    st.session_state.page_history = []
+if 'gmail_user' not in st.session_state:
+    st.session_state.gmail_user = ""
+if 'gmail_pass' not in st.session_state:
+    st.session_state.gmail_pass = ""
+if 'gmail_enabled' not in st.session_state:
+    st.session_state.gmail_enabled = False
 
 # ── Load everything ──────────────────────────────────────────
 df = load_data()
@@ -397,6 +480,25 @@ page = st.sidebar.radio("", [
     "📄 PDF Reports",
 ])
 
+# ── Back button logic ─────────────────────────────────────────
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = page
+
+if page != st.session_state.current_page:
+    st.session_state.page_history.append(st.session_state.current_page)
+    st.session_state.current_page = page
+
+st.sidebar.markdown("<hr style='border-color:#2a4060;margin:8px 0;'>", unsafe_allow_html=True)
+if st.session_state.page_history:
+    prev_page = st.session_state.page_history[-1]
+    if st.sidebar.button(f"⬅️ Back to {prev_page[:20]}…" if len(prev_page) > 20 else f"⬅️ Back to {prev_page}",
+                         use_container_width=True):
+        st.session_state.page_history.pop()
+        st.session_state.current_page = prev_page
+        st.rerun()
+else:
+    st.sidebar.button("⬅️ Back", disabled=True, use_container_width=True)
+
 st.sidebar.markdown(f"""
 <hr style='border-color:#2a4060;margin:12px 0;'>
 <div style='font-size:.7rem;color:#6a8faf;line-height:1.9;'>
@@ -415,9 +517,8 @@ st.sidebar.markdown(f"""
 # PAGE 1 — OVERVIEW DASHBOARD
 # ============================================================
 if page == "📊 Overview Dashboard":
-    st.title("🏥 MediTrack A+ — Management Overview")
-    st.caption("Real-time operational snapshot for clinic leadership.")
 
+    # ── HERO BANNER ──────────────────────────────────────────
     total_rev   = df['fee'].sum()
     noshow_rate = (df['status']=='No-show').mean()*100
     comp_rate   = (df['status']=='Completed').mean()*100
@@ -426,6 +527,42 @@ if page == "📊 Overview Dashboard":
     rev_lost    = df[df['status']=='No-show']['fee'].sum()
     avg_fee     = df['fee'].mean()
 
+    st.markdown(f"""
+    <div class='hero-banner'>
+      <div style='display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:24px;'>
+        <div style='flex:1;min-width:260px;'>
+          <div class='hero-title'>🏥 MediTrack A+</div>
+          <div class='hero-sub'>Healthcare Intelligence Platform — Management Overview</div>
+          <div class='hero-pills'>
+            <span class='hero-pill'>📅 {df['appointment_date'].min().strftime('%d %b %Y')} → {df['appointment_date'].max().strftime('%d %b %Y')}</span>
+            <span class='hero-pill'>🗂️ {len(df):,} Records</span>
+            <span class='hero-pill'>🔄 Live Data</span>
+            <span class='hero-pill'>🤖 AI-Powered</span>
+          </div>
+        </div>
+        <div style='display:flex;gap:32px;flex-wrap:wrap;'>
+          <div class='hero-stat'>
+            <div class='hero-stat-val'>Rs {total_rev/1_000_000:.1f}M</div>
+            <div class='hero-stat-lbl'>Total Revenue</div>
+          </div>
+          <div class='hero-stat'>
+            <div class='hero-stat-val'>{len(df):,}</div>
+            <div class='hero-stat-lbl'>Appointments</div>
+          </div>
+          <div class='hero-stat'>
+            <div class='hero-stat-val'>{noshow_rate:.1f}%</div>
+            <div class='hero-stat-lbl'>No-show Rate</div>
+          </div>
+          <div class='hero-stat'>
+            <div class='hero-stat-val'>{comp_rate:.0f}%</div>
+            <div class='hero-stat-lbl'>Completion</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── KPI CARDS ────────────────────────────────────────────
     k1,k2,k3,k4 = st.columns(4)
     k1.metric("💰 Total Revenue",      f"Rs {total_rev:,}",  f"Avg Rs {avg_fee:,.0f}/appt")
     k2.metric("📅 Total Appointments", f"{len(df):,}",        f"✅ {comp_rate:.1f}% completed")
@@ -714,7 +851,7 @@ elif page == "👤 Patient Profile":
                 return 'color:orange;font-weight:600'
 
             st.dataframe(
-                history.style.applymap(color_status, subset=['status'])
+                history.style.map(color_status, subset=['status'])
                              .format({'fee':'Rs {:,.0f}'}),
                 use_container_width=True
             )
@@ -772,10 +909,11 @@ elif page == "📅 Book Appointment":
                                   value=datetime.today() + timedelta(days=1))
 
         ah1, ah2 = st.columns(2)
-        p_hour   = ah1.slider("Appointment Hour", 9, 18, 10,
-                               format_func=lambda x: f"{x}:00 {'AM' if x<12 else 'PM'}")
-        p_type   = ah2.selectbox("Patient Type", [0,1],
-                                  format_func=lambda x: "🆕 New Patient" if x==0 else "🔄 Returning Patient")
+        hour_options = {f"{h}:00 {'AM' if h<12 else 'PM'}": h for h in range(9, 19)}
+        p_hour_label = ah1.selectbox("⏰ Appointment Hour", list(hour_options.keys()), index=1)
+        p_hour       = hour_options[p_hour_label]
+        p_type_label = ah2.selectbox("Patient Type", ["🆕 New Patient", "🔄 Returning Patient"])
+        p_type       = 0 if "New" in p_type_label else 1
 
         st.markdown("### 💰 Fee")
         p_fee = st.number_input("Consultation Fee (Rs)", min_value=500, max_value=10000,
@@ -866,26 +1004,33 @@ elif page == "🧠 Smart Reminders":
 
     mask = ((df_risk['risk_score']>=threshold) & df_risk['city'].isin(city_f) &
             df_risk['department'].isin(dept_f) & df_risk['doctor'].isin(doctor_f))
-    if pt_type=="New Only":      mask &= (df_risk['returning']==0)
+    if pt_type=="New Only":         mask &= (df_risk['returning']==0)
     elif pt_type=="Returning Only": mask &= (df_risk['returning']==1)
 
-    at_risk = df_risk[mask].copy()
+    at_risk = df_risk[mask].copy().reset_index(drop=True)   # ← reset_index prevents misalignment
     at_risk['Reminded']     = at_risk['patient_id'].astype(str).isin(reminded_ids)
     at_risk['Patient Type'] = at_risk['returning'].map({0:'🆕 New',1:'🔄 Returning'})
     at_risk['Risk Level']   = at_risk['risk_score'].apply(
         lambda x: '🔴 High' if x>=60 else ('🟡 Medium' if x>=35 else '🟢 Low'))
 
+    # ── Segmented subsets — always use boolean mask on at_risk to keep index clean
+    high_mask   = at_risk['Risk Level'] == '🔴 High'
+    medium_mask = at_risk['Risk Level'] == '🟡 Medium'
+    low_mask    = at_risk['Risk Level'] == '🟢 Low'
+    reminded_mask = at_risk['Reminded']
+
+    high_risk   = at_risk[high_mask]
+    medium_risk = at_risk[medium_mask]
+    low_risk    = at_risk[low_mask]
+    pending     = at_risk[~reminded_mask].copy()
+
     st.divider()
     m1,m2,m3,m4,m5 = st.columns(5)
     m1.metric("🔍 Total At-Risk",    len(at_risk))
-    m2.metric("🔴 High Risk",        len(at_risk[at_risk['Risk Level']=='🔴 High']))
-    m3.metric("🟡 Medium Risk",      len(at_risk[at_risk['Risk Level']=='🟡 Medium']))
-    m4.metric("✅ Already Reminded", at_risk['Reminded'].sum())
-    m5.metric("📨 Pending",          (~at_risk['Reminded']).sum())
-
-    high_risk   = at_risk[at_risk['Risk Level']=='🔴 High']
-    medium_risk = at_risk[at_risk['Risk Level']=='🟡 Medium']
-    low_risk    = at_risk[at_risk['Risk Level']=='🟢 Low']
+    m2.metric("🔴 High Risk",        high_mask.sum())
+    m3.metric("🟡 Medium Risk",      medium_mask.sum())
+    m4.metric("✅ Already Reminded", reminded_mask.sum())
+    m5.metric("📨 Pending",          (~reminded_mask).sum())
 
     st.divider()
     st.markdown("<div class='section-header'>📡 Smart Channel Recommendation</div>", unsafe_allow_html=True)
@@ -906,9 +1051,52 @@ elif page == "🧠 Smart Reminders":
                     f"<small>Timing: <b>24h</b> before</small><br>"
                     f"<small>Tone: Simple confirmation</small></div>", unsafe_allow_html=True)
 
+    # ── Gmail credentials UI ─────────────────────────────────
+    st.divider()
+    with st.expander("📧 Gmail Configuration — Click to set up real email sending", expanded=False):
+        st.info("To send real emails, enter your Gmail address and an **App Password** "
+                "(not your regular password). Go to Google Account → Security → 2-Step Verification → App Passwords to generate one.")
+        gm1, gm2 = st.columns(2)
+        with gm1:
+            new_gmail_user = st.text_input("Gmail Address", value=st.session_state.gmail_user,
+                                           placeholder="yourname@gmail.com")
+        with gm2:
+            new_gmail_pass = st.text_input("Gmail App Password (16 chars)", value=st.session_state.gmail_pass,
+                                           type="password", placeholder="xxxx xxxx xxxx xxxx")
+        col_save, col_test = st.columns(2)
+        with col_save:
+            if st.button("💾 Save Gmail Credentials", use_container_width=True):
+                st.session_state.gmail_user    = new_gmail_user.strip()
+                st.session_state.gmail_pass    = new_gmail_pass.strip()
+                st.session_state.gmail_enabled = bool(new_gmail_user.strip() and new_gmail_pass.strip())
+                st.success("✅ Credentials saved for this session!" if st.session_state.gmail_enabled
+                           else "⚠️ Both fields are required to enable Gmail.")
+        with col_test:
+            test_email = st.text_input("Test recipient email", placeholder="test@gmail.com")
+            if st.button("🧪 Send Test Email", use_container_width=True):
+                if not st.session_state.gmail_enabled:
+                    st.error("❌ Save valid Gmail credentials first.")
+                elif not test_email.strip():
+                    st.error("❌ Enter a recipient email for the test.")
+                else:
+                    ok = send_real_email(
+                        test_email.strip(), "Test User",
+                        "✅ MediTrack Test Email",
+                        "This is a test email from MediTrack A+.\n\nIf you received this, Gmail is configured correctly!",
+                        gmail_user=st.session_state.gmail_user,
+                        gmail_pass=st.session_state.gmail_pass,
+                    )
+                    if ok:
+                        st.success(f"✅ Test email sent to {test_email}!")
+                    else:
+                        st.error("❌ Failed. Check your credentials and ensure Less Secure App access or App Password is correct.")
+
+        gmail_status = "🟢 Gmail Ready" if st.session_state.gmail_enabled else "🔴 Gmail Not Configured"
+        st.caption(f"Status: {gmail_status}")
+
+    # ── Message preview ───────────────────────────────────────
     st.divider()
     st.markdown("<div class='section-header'>✍️ Smart Message Preview</div>", unsafe_allow_html=True)
-    pending = at_risk[~at_risk['Reminded']].copy()
 
     if not pending.empty:
         preview_name = st.selectbox("Preview message for:", pending['patient_name'].head(20).tolist())
@@ -924,35 +1112,65 @@ elif page == "🧠 Smart Reminders":
             channel = st.radio("📡 Channel", ["📱 SMS (Simulated)","📧 Email (Simulated)",
                                               "📱📧 Both (Simulated)","📞 Call (Simulated)"])
         with sc2:
+            n_high_pending   = int((high_mask & ~reminded_mask).sum())
+            n_med_high_pend  = int(((high_mask | medium_mask) & ~reminded_mask).sum())
+            n_all_pending    = len(pending)
             send_seg = st.radio("👥 Send To", [
-                f"🔴 High Risk Only ({len(high_risk[~high_risk['Reminded']])} pending)",
-                f"🟡 Medium + High ({len(pending[pending['Risk Level'].isin(['🔴 High','🟡 Medium'])])} pending)",
-                f"📋 All Pending ({len(pending)} pending)",
+                f"🔴 High Risk Only ({n_high_pending} pending)",
+                f"🟡 Medium + High ({n_med_high_pend} pending)",
+                f"📋 All Pending ({n_all_pending} pending)",
             ])
         with sc3:
             st.markdown("<br>", unsafe_allow_html=True)
-            send_btn = st.button("🚀 Send Smart Reminders", type="primary", use_container_width=True)
-            dry_run  = st.checkbox("🧪 Dry Run (preview only)")
+            send_btn  = st.button("🚀 Send Smart Reminders", type="primary", use_container_width=True)
+            dry_run   = st.checkbox("🧪 Dry Run (preview only)")
+            use_gmail = st.checkbox(
+                f"📧 Send Real Gmail {'✅' if st.session_state.gmail_enabled else '(configure above)'}",
+                value=st.session_state.gmail_enabled,
+                disabled=not st.session_state.gmail_enabled,
+            )
 
         if send_btn:
+            # Build to_send without index issues
             if "High Risk Only" in send_seg:
-                to_send  = high_risk[~high_risk['Reminded']]; msg_type="High-Risk Urgent"
+                to_send = at_risk[high_mask & ~reminded_mask].copy()
+                msg_type = "High-Risk Urgent"
             elif "Medium + High" in send_seg:
-                to_send  = pending[pending['Risk Level'].isin(['🔴 High','🟡 Medium'])]; msg_type="Medium-High"
+                to_send = at_risk[(high_mask | medium_mask) & ~reminded_mask].copy()
+                msg_type = "Medium-High"
             else:
-                to_send  = pending; msg_type="Standard"
+                to_send = pending.copy()
+                msg_type = "Standard"
 
             if dry_run:
                 st.info(f"🧪 **Dry Run:** Would send {len(to_send)} reminders. Nothing saved.")
                 st.dataframe(to_send[['patient_name','Risk Level','risk_score','doctor','department']].head(10))
             else:
+                sent_real = 0
                 with st.spinner(f"Dispatching {len(to_send)} smart reminders…"):
                     bar = st.progress(0)
-                    for i,(_, row) in enumerate(to_send.iterrows()):
+                    for i, (_, row) in enumerate(to_send.iterrows()):
                         time.sleep(0.005)
-                        bar.progress((i+1)/max(len(to_send),1))
+                        bar.progress((i+1) / max(len(to_send), 1))
+                        # Real Gmail sending
+                        if use_gmail and st.session_state.gmail_enabled:
+                            email_val = str(row.get('email', ''))
+                            if '@' in email_val and '.' in email_val:
+                                body = generate_smart_message(
+                                    row['patient_name'], row['doctor'], row['department'],
+                                    row['risk_score'], row.get('appointment_date'),
+                                    row['hour'], row['returning'], row['city'])
+                                subject = ("⚠️ URGENT: Appointment Reminder — MediTrack"
+                                           if row['risk_score'] >= 60 else
+                                           "📅 Appointment Reminder — MediTrack")
+                                if send_real_email(email_val, row['patient_name'], subject, body,
+                                                   gmail_user=st.session_state.gmail_user,
+                                                   gmail_pass=st.session_state.gmail_pass):
+                                    sent_real += 1
                     save_reminders(to_send, channel, msg_type)
-                st.success(f"✅ {len(to_send)} **{msg_type}** reminders sent via **{channel}**!")
+                st.success(f"✅ {len(to_send)} **{msg_type}** reminders dispatched via **{channel}**!")
+                if use_gmail and st.session_state.gmail_enabled:
+                    st.info(f"📧 {sent_real} real emails sent via Gmail.")
                 st.balloons()
                 st.cache_data.clear()
     else:
@@ -1204,8 +1422,9 @@ elif page == "📉 Revenue Forecast":
         x=future_dates, y=future_trend, name=f'{h_days}-Day Forecast',
         line=dict(color='#00b894', width=2.5)
     ))
-    # Divider line
-    fig.add_vline(x=str(last_date), line_dash="dash", line_color="gray",
+    # Divider line — convert timestamp to ms for plotly
+    fig.add_vline(x=int(pd.Timestamp(last_date).timestamp() * 1000),
+                  line_dash="dash", line_color="gray",
                   annotation_text="Forecast Start", annotation_position="top left")
 
     fig.update_layout(
